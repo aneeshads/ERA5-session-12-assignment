@@ -52,7 +52,7 @@ backward. Writing `layer_backward` myself forced the question "where does `W`
 come from right now?" — and the answer for ZeRO-3 is "it doesn't exist, gather
 it again".
 
-### Aside: what a matmul is
+### A brief description of matmul
 
 Every `mm_bf16(...)` in the simulator is a **matrix multiplication**, and it
 is where almost all of a network's compute goes, so it is worth being precise
