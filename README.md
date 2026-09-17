@@ -52,6 +52,54 @@ backward. Writing `layer_backward` myself forced the question "where does `W`
 come from right now?" — and the answer for ZeRO-3 is "it doesn't exist, gather
 it again".
 
+### Aside: what a matmul is
+
+Every `mm_bf16(...)` in the simulator is a **matrix multiplication**, and it
+is where almost all of a network's compute goes, so it is worth being precise
+about.
+
+Start with one neuron. It has a list of weights and takes a list of inputs;
+its output is *multiply each input by its weight, add them up* — a **dot
+product**:
+
+```
+inputs   x = [2, 1, 3]
+weights  w = [1, 0, 2]
+output     = 2·1 + 1·0 + 3·2 = 8
+```
+
+A layer has many neurons, and I feed it a *batch* of inputs, so I want every
+input dotted with every neuron. Put the inputs as rows of one matrix and the
+neurons as columns of another; matmul does all of those dot products at once:
+
+```
+        X (batch × in)          W (in × out)            Y = X @ W (batch × out)
+   ┌ 2  1  3 ┐  input #1     ┌ 1  5 ┐  neuron A, B     ┌ 8  11 ┐  input #1 → A, B
+   └ 0  4  1 ┘  input #2  @  │ 0  1 │             =    └ 2   4 ┘  input #2 → A, B
+                             └ 2  0 ┘
+```
+
+Cell *(i, j)* of the answer is *row i of X · column j of W*. Top-left is the
+neuron above: `2·1 + 1·0 + 3·2 = 8`. Top-right: `2·5 + 1·1 + 3·0 = 11`.
+
+**Shape rule:** `(batch × in) @ (in × out) → (batch × out)`. The inner
+dimension must match — it is the length of the lists being dotted — and it
+disappears.
+
+In `layer_forward`, `x` is 64 samples × 256 features and `W` is stored as
+`(out, in)` = 1024 × 256, so `W.T` is 256 × 1024 and `x @ W.T` is 64 × 1024:
+all 64 samples through all 1024 neurons in one call. Backward is two more
+matmuls of the same tensors rearranged — `dW = dout.T @ x` (how much each
+weight contributed to the error) and `dx = dout @ W` (how much each input
+did, to hand to the layer below). One matmul forward, two backward, each a
+multiply and an add per weight per sample: that is the `6·Ψ·batch` FLOPs in §3.
+
+Why it matters here: a `(a×b) @ (b×c)` matmul costs `a·b·c` multiply-adds —
+67 million for one 1024×1024 layer at batch 64 — and GPUs have hardware
+("tensor cores") that does nothing else. That is also why the bf16 note in the
+table above exists: a tensor core takes bf16 in, accumulates in fp32, and
+hands back bf16, which is exactly what `mm_bf16` imitates.
+
 ### Where 16 bytes per parameter comes from
 
 | what | dtype | bytes | who reads it |
