@@ -6,7 +6,7 @@ strategies — standard data parallelism (DDP) and ZeRO stages 1, 2 and 3 — an
 measures, at every step, the memory held on each GPU, the bytes moved over the
 interconnect, and the computation performed per GPU.
 
-* [`assignment.ipynb`](assignment.ipynb) — the executed notebook; runs unchanged on Google Colab with no setup
+* [`Session-12-assignment.ipynb`](assignment.ipynb) — the executed notebook; runs unchanged on Google Colab with no setup
 * [`zero_sim.py`](zero_sim.py) — the simulator: virtual GPUs, the interconnect, the hand-written model, and the four strategies
 * [`figures/`](figures/) — the plots reproduced below
 
